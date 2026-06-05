@@ -1,0 +1,21 @@
+# Build artifacts
+o4openai
+o4openai-test
+server
+dist/
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.test
+*.prof
+coverage.txt

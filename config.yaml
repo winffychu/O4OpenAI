@@ -1,0 +1,36 @@
+# O4OpenAI API Gateway Configuration
+#
+# OpenAI 兼容的 API 中转站，客户端的 API Key 透传给 Provider。
+# 网关本身不验证客户端 Key。
+
+server:
+  port: 1241
+  host: "0.0.0.0"
+  mode: "release"
+
+gateway:
+  # 外网可访问的 URL，用于 base64 图片转临时 URL
+  public_url: "http://465w9583j9.qicp.vip"
+
+  temp_image_ttl: 10
+  temp_image_cleanup_interval: 5
+
+providers:
+  agnes:
+    base_url: "https://apihub.agnes-ai.com/v1"
+    enabled: true
+    models:
+      - external_model: "agnes-1.5-flash"
+        provider_model: "agnes-1.5-flash"
+
+      - external_model: "agnes-2.0-flash"
+        provider_model: "agnes-2.0-flash"
+
+      - external_model: "agnes-image-2.0-flash"
+        provider_model: "agnes-image-2.0-flash"
+
+      - external_model: "agnes-image-2.1-flash"
+        provider_model: "agnes-image-2.1-flash"
+
+      - external_model: "agnes-video-v2.0"
+        provider_model: "agnes-video-v2.0"
