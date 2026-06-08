@@ -79,14 +79,21 @@
     - `FLUX.1-dev`、`Qwen-Image`、`Kolors`、`LongCat-Image`
   - **图生图**（multipart/form-data）
     - `LongCat-Image-Edit`、`Qwen-Image-Edit`、`FLUX.1-Kontext-dev`
-  - **视频**（异步任务：`/async/videos/generations` + `/task/{task_id}` 轮询）
-    - `Wan2.1-T2V-14B`、`Wan2_2-I2V-A14B`、`HunyuanVideo-1.5`
-    - `CogVideoX-5b`、`ViduQ2-Pro`、`ViduQ3-Pro`
+  - **视频**（异步任务）
+    - 文生视频：`POST /async/videos/generations`（model + prompt）
+    - 图生视频：`POST /async/videos/image-to-video`（model + prompt + image_url）
+    - 轮询状态：`GET /task/{task_id}`
+    - 模型：`Wan2.1-T2V-14B`、`Wan2.7`、`HunyuanVideo-1.5`、`CogVideoX-5b`
+    - `ViduQ2-Turbo`、`ViduQ2-Pro`、`ViduQ3-Turbo`、`ViduQ3-Pro`、`HappyHorse-1.0`
 
 实现要点：
-  - **Chat / 文本**：Moark 接受标准 OpenAI 请求体（含 `tools`、`response_format`、多模态 `image_url` 等），网关直接透传。
+  - **Chat / 文本**：Moark 接受标准 OpenAI 请求体（含 `tools`、`response_format`、多模态 `image_url` 等），网关直接透传。额外参数（如 `top_k`、`guided_json`、`guided_choice`）通过 `Extra` map 合并到请求体。
   - **图生图**（`/v1/images/edits`）：Moark 要求 `multipart/form-data`。`image` 字段是 URL 时按文本字段提交；是 base64 / Data URI 时解码后作为文件字段提交。
-  - **视频**：调用 `POST /v1/async/videos/generations` 拿到 `task_id`，客户端轮询 `GET /v1/videos/{id}` 时网关转发到 `GET /v1/task/{task_id}`，根据 `output.url` 拼回 OpenAI 视频响应。
+  - **视频**：根据输入类型自动路由到不同端点：
+    - 无图片输入 → `POST /async/videos/generations`（文生视频，body: `model` + `prompt`）
+    - 有图片输入 → `POST /async/videos/image-to-video`（图生视频，body: `model` + `prompt` + `image_url`）
+    - 客户端轮询 `GET /v1/videos/{id}` 时网关转发到 `GET /v1/task/{task_id}`，根据 `output.url` 拼回 OpenAI 视频响应。
+  - **模型发现**：支持 `GET /v1/models` 动态获取上游模型列表，失败时回退到硬编码列表。
   - **Anthropic Messages** 与 **OpenAI Responses**：无需在 provider 层处理，网关统一在 handler 层转译到 Chat 完成后透传。
 
 ### Provider 能力矩阵
@@ -153,8 +160,12 @@ go run cmd/server/main.go
 或编译后运行：
 
 ```bash
-GOOS=$(uname -s | tr A-Z a-z) GOARCH=arm64 go build -o o4openai ./cmd/server/
-./o4openai
+# macOS
+go build -o o4openai ./cmd/server/
+
+# 交叉编译 Linux
+GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/o4openai-linux-amd64 ./cmd/server/
+GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/o4openai-linux-arm64 ./cmd/server/
 ```
 
 ## 测试用例
@@ -506,14 +517,15 @@ Anthropic 接口（`/v1/messages`）返回 Anthropic 格式的错误：
 │  ┌───────┴──────────────────────────────────────────┐        │
 │  │         Provider Interface (接口层)               │        │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────────┐     │        │
-│  │  │  Agnes   │ │  OpenAI  │ │   Future     │     │        │
+│  │  │  Agnes   │ │  Moark   │ │   Future     │     │        │
 │  │  │ Provider │ │ Provider │ │  Providers   │     │        │
 │  │  └────┬─────┘ └────┬─────┘ └──────────────┘     │        │
 │  └───────┼────────────┼────────────────────────────┘        │
 │          │ (error/status passthrough)                        │
 │          ▼                                                   │
-│    Agnes AI API                                              │
+│    Agnes AI API / Moark API                                  │
 │    https://apihub.agnes-ai.com/v1                            │
+│    https://api.moark.com/v1                                  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
