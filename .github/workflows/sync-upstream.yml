@@ -27,6 +27,9 @@ jobs:
         run: |
           git remote add upstream https://github.com/javpower/O4OpenAI.git
           git fetch upstream main
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
           mkdir -p /tmp/wf
           cp -r .github/workflows/* /tmp/wf/ 2>/dev/null || true
           git merge upstream/main --no-edit -X theirs
@@ -35,4 +38,4 @@ jobs:
           cp -r /tmp/wf/* .github/workflows/ 2>/dev/null || true
           git add -A
           git commit --amend --no-edit
-          git push origin main
+          git push --force-with-lease origin main
