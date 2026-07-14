@@ -27,5 +27,14 @@ jobs:
         run: |
           git remote add upstream https://github.com/javpower/O4OpenAI.git
           git fetch upstream main
-          git merge upstream/main --no-edit
+          # Save our workflow files before merge
+          cp .github/workflows/docker.yml /tmp/docker.yml.bak
+          cp .github/workflows/sync-upstream.yml /tmp/sync-upstream.yml.bak 2>/dev/null || true
+          # Merge with upstream, prefer upstream on conflict
+          git merge upstream/main --no-edit -X theirs
+          # Restore our workflow files (keep our CI config, not upstream's)
+          cp /tmp/docker.yml.bak .github/workflows/docker.yml
+          cp /tmp/sync-upstream.yml.bak .github/workflows/sync-upstream.yml 2>/dev/null || true
+          git add .github/workflows/
+          git commit --amend --no-edit
           git push origin main
